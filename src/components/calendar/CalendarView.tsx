@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { Calendar, momentLocalizer, type Event, type ToolbarProps } from 'react-big-calendar'
+import { cloneElement, useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { Calendar, momentLocalizer, type DateCellWrapperProps, type Event, type ToolbarProps } from 'react-big-calendar'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -164,6 +164,10 @@ export default function CalendarView() {
     setModalOpen(true)
   }, [])
 
+  const TouchDateCell = useCallback(({ children, value }: DateCellWrapperProps) => cloneElement(children, {
+    onPointerUp: (event: ReactPointerEvent) => event.pointerType === 'touch' && handleSelectSlot({ start: value })
+  }), [handleSelectSlot])
+
   const handleSave = () => {
     if (selectedDate) {
       saveMutation.mutate({
@@ -245,7 +249,8 @@ export default function CalendarView() {
             }
           }}
           components={{
-            toolbar: CustomToolbar
+            toolbar: CustomToolbar,
+            dateCellWrapper: TouchDateCell
           }}
         />
       </div>
