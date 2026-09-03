@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f4f7fb;
+  --foreground: #172033;
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-solid: #ffffff;
+  --muted: #657087;
+  --border: #dce3ee;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+}
+
+/* Estilos personalizados para las tablas del editor de la Bitácora (2 columnas) */
+.tiptap-table-split .tableWrapper {
+  width: 100% !important;
+  margin: 0 !important;
+}
+.tiptap-table-split table {
+  width: 100% !important;
+  table-layout: fixed !important;
+  margin: 0 !important;
+  border: none !important;
+}
+.tiptap-table-split td {
+  vertical-align: top !important;
+  padding: 1rem 0 !important;
+  border: none !important;
+}
+.tiptap-table-split td:first-child {
+  border-right: 2px solid #e5e7eb !important;
+  padding-right: 2rem !important;
+}
+.tiptap-table-split td:last-child {
+  padding-left: 2rem !important;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-geist), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a,
+input,
+textarea {
+  outline-color: var(--primary);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.25);
+  outline-offset: 2px;
+}
+
+.rbc-calendar {
+  color: #273249;
+}
+
+.rbc-month-view {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.rbc-header {
+  padding: 0.8rem 0.4rem;
+  border-color: var(--border) !important;
+  color: #667085;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rbc-day-bg + .rbc-day-bg,
+.rbc-month-row + .rbc-month-row {
+  border-color: var(--border);
+}
+
+.rbc-off-range-bg {
+  background: #f8fafc;
+}
+
+.rbc-today {
+  background: #eff6ff;
+}
+
+.rbc-date-cell {
+  padding: 0.55rem 0.65rem 0;
+  color: #667085;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.rbc-date-cell.rbc-now {
+  color: var(--primary);
+}
+
+.rbc-event {
+  padding: 0.2rem 0.45rem;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.18);
+  font-size: 0.8125rem;
+}
+
+.rbc-show-more {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@media (max-width: 640px) {
+  .rbc-header {
+    padding-inline: 0.15rem;
+    font-size: 0.65rem;
+    letter-spacing: 0;
+  }
+
+  .rbc-date-cell {
+    padding: 0.35rem 0.4rem 0;
+  }
+
+  .tiptap-table-split table,
+  .tiptap-table-split tbody,
+  .tiptap-table-split tr,
+  .tiptap-table-split td {
+    display: block;
+    width: 100% !important;
+  }
+
+  .tiptap-table-split td,
+  .tiptap-table-split td:first-child,
+  .tiptap-table-split td:last-child {
+    padding: 0.75rem 0 !important;
+    border-right: 0 !important;
+  }
+}
