@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Calendar, momentLocalizer, type Event, type ToolbarProps } from 'react-big-calendar'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { format } from 'date-fns'
@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDailyNotes, saveEvent, deleteEvent } from '@/lib/actions/notes'
 import { Loader2, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTheme } from '@/components/providers/ThemeProvider'
+import { flushOfflineQueue, queueOffline, readOffline, writeOffline } from '@/lib/offline'
 
 moment.locale('es')
 const localizer = momentLocalizer(moment)
@@ -44,15 +45,39 @@ export default function CalendarView() {
 
   const start = format(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), 'yyyy-MM-dd')
   const end = format(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0), 'yyyy-MM-dd')
+  const cacheKey = `notes:${start}:${end}`
 
   const { data: notes, isLoading, isError } = useQuery({
     queryKey: ['notes', start, end],
-    queryFn: () => getDailyNotes(start, end),
+    queryFn: async () => {
+      const cached = await readOffline<DailyNote[]>(cacheKey)
+      if (!navigator.onLine) return cached ?? []
+      try {
+        const data = await getDailyNotes(start, end)
+        await writeOffline(cacheKey, data)
+        return data
+      } catch (error) {
+        if (cached) return cached
+        throw error
+      }
+    },
   })
 
   const saveMutation = useMutation({
-    mutationFn: (data: { id: string | null, date: string, title: string, content: string }) => 
-      saveEvent(data.id, data.date, data.title, data.content),
+    mutationFn: async (data: { id: string | null, date: string, title: string, content: string }) => {
+      if (navigator.onLine) return saveEvent(data.id, data.date, data.title, data.content)
+
+      const localId = data.id ?? `offline-${crypto.randomUUID()}`
+      const cached = await readOffline<DailyNote[]>(cacheKey) ?? []
+      const note = { id: localId, date: data.date, title: data.title || 'Sin título', content: data.content }
+      await writeOffline(cacheKey, [...cached.filter((item) => item.id !== localId), note])
+      await queueOffline({
+        kind: 'save-event',
+        localId,
+        payload: [data.id?.startsWith('offline-') ? null : data.id, data.date, data.title, data.content],
+      })
+      return [note]
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notes'] })
       setMutationError(null)
@@ -62,7 +87,13 @@ export default function CalendarView() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteEvent(id),
+    mutationFn: async (id: string) => {
+      if (navigator.onLine) return deleteEvent(id)
+
+      const cached = await readOffline<DailyNote[]>(cacheKey) ?? []
+      await writeOffline(cacheKey, cached.filter((item) => item.id !== id))
+      await queueOffline({ kind: 'delete-event', localId: id, payload: [id] })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notes'] })
       setMutationError(null)
@@ -70,6 +101,13 @@ export default function CalendarView() {
     },
     onError: (error: Error) => setMutationError(error.message)
   })
+
+  useEffect(() => {
+    const sync = () => flushOfflineQueue().then(() => queryClient.invalidateQueries({ queryKey: ['notes'] }))
+    window.addEventListener('online', sync)
+    void sync()
+    return () => window.removeEventListener('online', sync)
+  }, [queryClient])
 
   const events: CalendarEvent[] = notes?.map((note: DailyNote) => {
     const [year, month, day] = note.date.split('-').map(Number)

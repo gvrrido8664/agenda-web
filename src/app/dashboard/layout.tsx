@@ -3,10 +3,15 @@
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, BookOpen, CalendarDays, LogOut, Palette, UserCircle } from 'lucide-react'
+import { Calendar, BookOpen, CalendarDays, Download, LogOut, Palette, UserCircle, WifiOff } from 'lucide-react'
 import { ThemeProvider, useTheme } from '@/components/providers/ThemeProvider'
 import { useState, useEffect } from 'react'
 import { getUserProfile, updateUserName } from '@/lib/actions/user'
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -19,6 +24,8 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   const [tempName, setTempName] = useState('')
   const [profileError, setProfileError] = useState<string | null>(null)
   const [isSavingName, setIsSavingName] = useState(false)
+  const [isOnline, setIsOnline] = useState(true)
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 
   useEffect(() => {
     getUserProfile()
@@ -32,6 +39,24 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => setProfileError('No pudimos cargar tu perfil.'))
+  }, [])
+
+  useEffect(() => {
+    const updateConnection = () => setIsOnline(navigator.onLine)
+    const captureInstall = (event: Event) => {
+      event.preventDefault()
+      setInstallPrompt(event as BeforeInstallPromptEvent)
+    }
+
+    updateConnection()
+    window.addEventListener('online', updateConnection)
+    window.addEventListener('offline', updateConnection)
+    window.addEventListener('beforeinstallprompt', captureInstall)
+    return () => {
+      window.removeEventListener('online', updateConnection)
+      window.removeEventListener('offline', updateConnection)
+      window.removeEventListener('beforeinstallprompt', captureInstall)
+    }
   }, [])
 
   const handleSaveName = async () => {
@@ -56,8 +81,18 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
       setProfileError('No pudimos cerrar tu sesión.')
       return
     }
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('agenda-offline:'))
+      .forEach((key) => localStorage.removeItem(key))
     router.replace('/login')
     router.refresh()
+  }
+
+  const handleInstall = async () => {
+    if (!installPrompt) return
+    await installPrompt.prompt()
+    await installPrompt.userChoice
+    setInstallPrompt(null)
   }
 
   const colorOptions = [
@@ -109,9 +144,20 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             <h1 className="text-base font-semibold tracking-tight text-slate-900">Mi Agenda</h1>
             <p className="text-xs text-slate-500">Organización personal</p>
           </div>
+          {!isOnline && <WifiOff className="ml-auto h-5 w-5 text-amber-600 lg:hidden" aria-label="Sin conexión" />}
+          {installPrompt && (
+            <button
+              onClick={handleInstall}
+              className={`${isOnline ? 'ml-auto' : ''} rounded-lg p-2 text-blue-600 transition hover:bg-blue-50 lg:hidden`}
+              aria-label="Instalar aplicación"
+              title="Instalar aplicación"
+            >
+              <Download className="h-5 w-5" />
+            </button>
+          )}
           <button
             onClick={handleSignOut}
-            className="ml-auto rounded-lg p-2 text-slate-500 transition hover:bg-red-50 hover:text-red-600 lg:hidden"
+            className={`${isOnline && !installPrompt ? 'ml-auto' : ''} rounded-lg p-2 text-slate-500 transition hover:bg-red-50 hover:text-red-600 lg:hidden`}
             aria-label="Cerrar sesión"
             title="Cerrar sesión"
           >
@@ -177,6 +223,21 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="hidden border-t border-slate-100 bg-slate-50/70 px-5 py-5 lg:block">
+          {!isOnline && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              <WifiOff className="h-4 w-4" />
+              Trabajando sin conexión
+            </div>
+          )}
+          {installPrompt && (
+            <button
+              onClick={handleInstall}
+              className="mb-3 flex w-full items-center rounded-lg px-2 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+            >
+              <Download className="mr-3 h-4 w-4" />
+              Instalar aplicación
+            </button>
+          )}
           {userName && (
             <div className="text-sm font-bold text-gray-700 mb-3 px-2 flex items-center">
               <UserCircle className="w-4 h-4 mr-2 text-blue-600" />

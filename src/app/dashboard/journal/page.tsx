@@ -6,6 +6,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getWeeklyLog, upsertWeeklyLog } from '@/lib/actions/logs'
 import JournalEditor from '@/components/journal/JournalEditor'
 import { ChevronLeft, ChevronRight, Loader2, Edit3 } from 'lucide-react'
+import { flushOfflineQueue, queueOffline, readOffline, writeOffline } from '@/lib/offline'
+
+type WeeklyLog = {
+  content_markdown: string | null
+}
 
 export default function JournalPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -14,10 +19,22 @@ export default function JournalPage() {
 
   const isoWeek = getISOWeek(currentDate)
   const year = getISOWeekYear(currentDate)
+  const cacheKey = `log:${year}:${isoWeek}`
 
   const { data: log, isLoading } = useQuery({
     queryKey: ['weekly_log', year, isoWeek],
-    queryFn: () => getWeeklyLog(isoWeek, year),
+    queryFn: async () => {
+      const cached = await readOffline<WeeklyLog>(cacheKey)
+      if (!navigator.onLine) return cached
+      try {
+        const data = await getWeeklyLog(isoWeek, year)
+        await writeOffline(cacheKey, data)
+        return data
+      } catch (error) {
+        if (cached) return cached
+        throw error
+      }
+    },
   })
 
   // Iniciar en modo edición si no hay bitácora guardada
@@ -30,7 +47,15 @@ export default function JournalPage() {
   }, [log, isLoading, isoWeek, year])
 
   const mutation = useMutation({
-    mutationFn: (content: string) => upsertWeeklyLog(isoWeek, year, content),
+    mutationFn: async (content: string) => {
+      if (navigator.onLine) return upsertWeeklyLog(isoWeek, year, content)
+      await writeOffline(cacheKey, { content_markdown: content })
+      await queueOffline({
+        kind: 'save-log',
+        localId: `${year}:${isoWeek}`,
+        payload: [isoWeek, year, content],
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['weekly_log'] })
       setSaveError(null)
@@ -40,6 +65,13 @@ export default function JournalPage() {
       setSaveError(error.message)
     }
   })
+
+  useEffect(() => {
+    const sync = () => flushOfflineQueue().then(() => queryClient.invalidateQueries({ queryKey: ['weekly_log'] }))
+    window.addEventListener('online', sync)
+    void sync()
+    return () => window.removeEventListener('online', sync)
+  }, [queryClient])
 
   const handlePrevWeek = () => setCurrentDate(prev => subWeeks(prev, 1))
   const handleNextWeek = () => setCurrentDate(prev => addWeeks(prev, 1))

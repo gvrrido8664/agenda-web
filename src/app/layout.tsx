@@ -11,6 +11,15 @@ const geist = localFont({
 export const metadata: Metadata = {
   title: "Agenda Digital",
   description: "Agenda y bitácora personal offline-first",
+  icons: {
+    icon: "/icon-192x192.png",
+    apple: "/icon-192x192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Mi Agenda",
+  },
 };
 
 export default function RootLayout({
