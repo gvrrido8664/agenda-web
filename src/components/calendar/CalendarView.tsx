@@ -83,7 +83,7 @@ export default function CalendarView() {
       setMutationError(null)
       setModalOpen(false)
     },
-    onError: (error: Error) => setMutationError(error.message)
+    onError: () => setMutationError('No pudimos guardar el evento. Inténtalo nuevamente.')
   })
 
   const deleteMutation = useMutation({
@@ -99,7 +99,7 @@ export default function CalendarView() {
       setMutationError(null)
       setModalOpen(false)
     },
-    onError: (error: Error) => setMutationError(error.message)
+    onError: () => setMutationError('No pudimos eliminar el evento. Inténtalo nuevamente.')
   })
 
   useEffect(() => {
