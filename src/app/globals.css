@@ -149,3 +149,34 @@ textarea:focus-visible {
     border-right: 0 !important;
   }
 }
+
+
+/* Tiptap Task List Styles */
+ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+}
+
+ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+ul[data-type="taskList"] li > label {
+  flex: 0 0 auto;
+  margin-right: 0.5rem;
+  user-select: none;
+  margin-top: 0.25rem;
+}
+
+ul[data-type="taskList"] li > label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+}
+ul[data-type="taskList"] li > div > p {
+  margin: 0;
+}

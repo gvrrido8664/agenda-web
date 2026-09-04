@@ -4,8 +4,10 @@ import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
-import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, List, ListOrdered, Save, Quote, Undo, Redo, RotateCcw } from 'lucide-react'
+import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, List, ListOrdered, Save, Quote, Undo, Redo, RotateCcw, CheckSquare } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface JournalEditorProps {
@@ -49,16 +51,9 @@ const MenuBar = ({ editor, template }: { editor: Editor | null, template: string
       
       <div className="w-px h-5 bg-gray-300 mx-1" />
 
-      <button type="button" onClick={() => editor.chain().focus().toggleHighlight({ color: '#fef08a' }).run()} className={btnClass(editor.isActive('highlight', { color: '#fef08a' }))} title="Resaltar amarillo" aria-label="Resaltar amarillo"><div className="w-4 h-4 rounded-full bg-yellow-200 border border-yellow-400" /></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHighlight({ color: '#bbf7d0' }).run()} className={btnClass(editor.isActive('highlight', { color: '#bbf7d0' }))} title="Resaltar verde" aria-label="Resaltar verde"><div className="w-4 h-4 rounded-full bg-green-200 border border-green-400" /></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHighlight({ color: '#fecaca' }).run()} className={btnClass(editor.isActive('highlight', { color: '#fecaca' }))} title="Resaltar rojo" aria-label="Resaltar rojo"><div className="w-4 h-4 rounded-full bg-red-200 border border-red-400" /></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHighlight({ color: '#bfdbfe' }).run()} className={btnClass(editor.isActive('highlight', { color: '#bfdbfe' }))} title="Resaltar azul" aria-label="Resaltar azul"><div className="w-4 h-4 rounded-full bg-blue-200 border border-blue-400" /></button>
-      <button type="button" onClick={() => editor.chain().focus().unsetHighlight().run()} className={btnClass(false)} title="Quitar resaltado" aria-label="Quitar resaltado"><div className="w-4 h-4 rounded-full bg-white border border-gray-300 relative overflow-hidden"><div className="absolute inset-0 bg-red-500 w-[2px] h-full rotate-45 left-1.5" /></div></button>
-
-      <div className="w-px h-5 bg-gray-300 mx-1" />
-      
       <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btnClass(editor.isActive('bulletList'))} title="Lista de viñetas" aria-label="Lista de viñetas"><List className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btnClass(editor.isActive('orderedList'))} title="Lista numerada" aria-label="Lista numerada"><ListOrdered className="w-4 h-4" /></button>
+      <button type="button" onClick={() => editor.chain().focus().toggleTaskList().run()} className={btnClass(editor.isActive('taskList'))} title="Lista de tareas (Checklist)" aria-label="Lista de tareas"><CheckSquare className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} className={btnClass(editor.isActive('blockquote'))} title="Cita" aria-label="Cita"><Quote className="w-4 h-4" /></button>
 
       <div className="flex-1" />
@@ -88,6 +83,8 @@ export default function JournalEditor({ initialContent, template, onSave, isSavi
       StarterKit,
       Underline,
       Highlight.configure({ multicolor: true }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
@@ -118,24 +115,48 @@ export default function JournalEditor({ initialContent, template, onSave, isSavi
   }, [editor, readOnly])
 
   return (
-    <div className={readOnly ? '' : 'relative flex flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-xl shadow-slate-200/40 backdrop-blur-md transition-shadow focus-within:shadow-2xl'}>
-      {!readOnly && <MenuBar editor={editor} template={template} />}
-      
-      <div className="flex-1 overflow-y-auto bg-transparent">
-        <EditorContent editor={editor} />
-      </div>
+    <>
+      <style>{`
+        ul[data-type="taskList"] {
+          list-style: none;
+          padding: 0;
+        }
+        ul[data-type="taskList"] p {
+          margin: 0;
+        }
+        ul[data-type="taskList"] li {
+          display: flex;
+          align-items: flex-start;
+          margin-bottom: 0.5rem;
+        }
+        ul[data-type="taskList"] li > label {
+          margin-right: 0.5rem;
+          margin-top: 0.2rem;
+          user-select: none;
+        }
+        ul[data-type="taskList"] li > div {
+          flex: 1;
+        }
+      `}</style>
+      <div className={readOnly ? '' : 'relative flex flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-xl shadow-slate-200/40 backdrop-blur-md transition-shadow focus-within:shadow-2xl'}>
+        {!readOnly && <MenuBar editor={editor} template={template} />}
+        
+        <div className="flex-1 overflow-y-auto bg-transparent">
+          <EditorContent editor={editor} />
+        </div>
 
-      {!readOnly && <div className="flex items-center justify-end border-t border-slate-200/70 bg-slate-50/70 px-6 py-4">
-        <button
-          type="button"
-          onClick={() => onSave?.(content)}
-          disabled={isSaving}
-          className="flex items-center rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-70"
-        >
-          <Save className="w-4 h-4 mr-2" />
-          {isSaving ? 'Guardando...' : 'Guardar Bitácora'}
-        </button>
-      </div>}
-    </div>
+        {!readOnly && <div className="flex items-center justify-end border-t border-slate-200/70 bg-slate-50/70 px-6 py-4">
+          <button
+            type="button"
+            onClick={() => onSave?.(content)}
+            disabled={isSaving}
+            className="flex items-center rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-70"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {isSaving ? 'Guardando...' : 'Guardar Bitácora'}
+          </button>
+        </div>}
+      </div>
+    </>
   )
 }

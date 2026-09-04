@@ -9,9 +9,10 @@ import moment from 'moment'
 import 'moment/locale/es'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDailyNotes, saveEvent, deleteEvent } from '@/lib/actions/notes'
-import { Loader2, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, Trash2, ChevronLeft, ChevronRight, Plus, Edit2 } from 'lucide-react'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import { flushOfflineQueue, queueOffline, readOffline, writeOffline } from '@/lib/offline'
+import CalendarEditor from './CalendarEditor'
 
 moment.locale('es')
 const localizer = momentLocalizer(moment)
@@ -33,6 +34,7 @@ type CalendarEvent = Event & {
 export default function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [modalOpen, setModalOpen] = useState(false)
+  const [isViewing, setIsViewing] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   
   const [eventId, setEventId] = useState<string | null>(null)
@@ -81,7 +83,6 @@ export default function CalendarView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notes'] })
       setMutationError(null)
-      setModalOpen(false)
     },
     onError: () => setMutationError('No pudimos guardar el evento. Inténtalo nuevamente.')
   })
@@ -112,11 +113,12 @@ export default function CalendarView() {
   const events: CalendarEvent[] = notes?.map((note: DailyNote) => {
     const [year, month, day] = note.date.split('-').map(Number)
     const localDate = new Date(year, month - 1, day)
+    const endDate = new Date(year, month - 1, day, 23, 59, 59)
     return {
       id: note.id,
       title: note.title || note.content?.substring(0, 20) || 'Evento',
       start: localDate,
-      end: localDate,
+      end: endDate,
       allDay: true,
       resource: note
     }
@@ -152,6 +154,7 @@ export default function CalendarView() {
     setEventTitle('')
     setEventContent('')
     setMutationError(null)
+    setIsViewing(false)
     setModalOpen(true)
   }, [])
 
@@ -161,12 +164,30 @@ export default function CalendarView() {
     setEventTitle(event.resource.title || '')
     setEventContent(event.resource.content || '')
     setMutationError(null)
+    setIsViewing(true)
     setModalOpen(true)
   }, [])
 
   const TouchDateCell = useCallback(({ children, value }: DateCellWrapperProps) => cloneElement(children, {
     onPointerUp: (event: ReactPointerEvent) => event.pointerType === 'touch' && handleSelectSlot({ start: value })
   }), [handleSelectSlot])
+
+  const CustomDateHeader = useCallback(({ label, date }: { label: string, date: Date }) => (
+    <div className="flex justify-end items-center gap-1 pr-1">
+      <button
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          handleSelectSlot({ start: date })
+        }}
+        className="p-1 text-slate-400 hover:text-blue-500 rounded-full hover:bg-blue-50 transition-colors z-20"
+        title="Nuevo evento"
+      >
+        <Plus className="w-4 h-4" />
+      </button>
+      <span className="text-sm font-medium">{label}</span>
+    </div>
+  ), [handleSelectSlot])
 
   const handleSave = () => {
     if (selectedDate) {
@@ -175,8 +196,26 @@ export default function CalendarView() {
         date: format(selectedDate, 'yyyy-MM-dd'),
         title: eventTitle,
         content: eventContent,
+      }, {
+        onSuccess: () => setModalOpen(false)
       })
     }
+  }
+
+  const handleClose = () => {
+    if (isViewing && eventId && selectedDate) {
+      if (saveMutation.isPending) return
+      saveMutation.mutate({
+        id: eventId,
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        title: eventTitle,
+        content: eventContent,
+      }, {
+        onSuccess: () => setModalOpen(false)
+      })
+      return
+    }
+    setModalOpen(false)
   }
 
   const CustomToolbar = (toolbar: ToolbarProps<CalendarEvent>) => {
@@ -250,36 +289,60 @@ export default function CalendarView() {
           }}
           components={{
             toolbar: CustomToolbar,
-            dateCellWrapper: TouchDateCell
+            dateCellWrapper: TouchDateCell,
+            month: {
+              dateHeader: CustomDateHeader
+            }
           }}
         />
       </div>
 
       {modalOpen && selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onKeyDown={(event) => event.key === 'Escape' && setModalOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onKeyDown={(event) => event.key === 'Escape' && handleClose()}>
           <div role="dialog" aria-modal="true" aria-labelledby="event-dialog-title" className="flex w-full max-w-lg flex-col rounded-2xl border border-white/40 bg-white p-6 shadow-2xl sm:p-7">
-            <h3 id="event-dialog-title" className="mb-5 text-xl font-semibold capitalize text-slate-900">
-              {eventId ? 'Editar evento' : 'Nuevo evento'} · {format(selectedDate, "d 'de' MMMM", { locale: es })}
-            </h3>
-            <label htmlFor="event-title" className="mb-2 text-sm font-medium text-slate-700">Título</label>
-            <input
-              id="event-title"
-              autoFocus
-              maxLength={120}
-              className="mb-4 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 font-medium text-slate-900 transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
-              placeholder="Nombre del evento..."
-              value={eventTitle}
-              onChange={(e) => setEventTitle(e.target.value)}
-            />
+            <div className="flex justify-between items-start mb-5">
+              <h3 id="event-dialog-title" className="text-xl font-semibold capitalize text-slate-900">
+                {eventId ? (isViewing ? 'Ver evento' : 'Editar evento') : 'Nuevo evento'} · {format(selectedDate, "d 'de' MMMM", { locale: es })}
+              </h3>
+              {isViewing && (
+                <button
+                  onClick={() => setIsViewing(false)}
+                  className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-100 transition-colors ml-4"
+                >
+                  <Edit2 className="w-4 h-4" /> Editar
+                </button>
+              )}
+            </div>
 
-            <label htmlFor="event-notes" className="mb-2 text-sm font-medium text-slate-700">Notas</label>
-            <textarea
-              id="event-notes"
-              className="h-32 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-base text-slate-900 transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
-              placeholder="Añade tus apuntes, notas o detalles del evento aquí..."
-              value={eventContent}
-              onChange={(e) => setEventContent(e.target.value)}
-            />
+            {isViewing ? (
+              <div className="mb-4 space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-slate-500 mb-1">Título</h4>
+                  <p className="text-lg font-medium text-slate-900">{eventTitle || 'Sin título'}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-slate-500 mb-1">Notas</h4>
+                  <CalendarEditor content={eventContent || '<p>No hay notas para este evento.</p>'} onChange={setEventContent} readOnly={true} />
+                </div>
+              </div>
+            ) : (
+              <>
+                <label htmlFor="event-title" className="mb-2 text-sm font-medium text-slate-700">Título</label>
+                <input
+                  id="event-title"
+                  autoFocus
+                  maxLength={120}
+                  className="mb-4 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 font-medium text-slate-900 transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  placeholder="Nombre del evento..."
+                  value={eventTitle}
+                  onChange={(e) => setEventTitle(e.target.value)}
+                />
+
+                <label className="mb-2 text-sm font-medium text-slate-700">Notas</label>
+                <CalendarEditor content={eventContent} onChange={setEventContent} />
+                
+              </>
+            )}
             {mutationError && <p role="alert" className="mt-3 text-sm text-red-600">{mutationError}</p>}
             
             <div className="mt-6 flex justify-between items-center">
@@ -296,17 +359,20 @@ export default function CalendarView() {
               <div className="flex space-x-3">
                 <button
                   className="rounded-xl px-5 py-2.5 font-semibold text-slate-600 transition-colors hover:bg-slate-100"
-                  onClick={() => setModalOpen(false)}
+                  onClick={handleClose}
+                  disabled={isViewing && saveMutation.isPending}
                 >
-                  Cancelar
+                  {isViewing && saveMutation.isPending ? 'Guardando...' : isViewing ? 'Cerrar' : 'Cancelar'}
                 </button>
-                <button
-                  className="rounded-xl bg-blue-600 px-6 py-2.5 font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:opacity-50"
-                  onClick={handleSave}
-                  disabled={saveMutation.isPending}
-                >
-                  {saveMutation.isPending ? 'Guardando...' : 'Guardar'}
-                </button>
+                {!isViewing && (
+                  <button
+                    className="rounded-xl bg-blue-600 px-6 py-2.5 font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:opacity-50"
+                    onClick={handleSave}
+                    disabled={saveMutation.isPending}
+                  >
+                    {saveMutation.isPending ? 'Guardando...' : 'Guardar'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
