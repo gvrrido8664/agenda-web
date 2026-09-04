@@ -46,8 +46,6 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
 
 export default function CalendarEditor({ content, onChange, readOnly = false }: CalendarEditorProps) {
   const editorRef = useRef<Editor | null>(null)
-  const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
 
   const editor = useEditor({
     extensions: [
@@ -55,23 +53,25 @@ export default function CalendarEditor({ content, onChange, readOnly = false }: 
       TaskList,
       TaskItem.configure({ 
         nested: true,
-        onReadOnlyChecked: () => {
-          setTimeout(() => {
-            const ed = editorRef.current
-            if (ed) {
-              const dom = ed.view.dom
-              const checkboxes = dom.querySelectorAll('li[data-type="taskItem"] input[type="checkbox"]')
-              checkboxes.forEach((cb) => {
-                const li = cb.closest('li')
-                if (li) {
-                  li.setAttribute('data-checked', (cb as HTMLInputElement).checked ? 'true' : 'false')
-                }
-              })
-              const updatedHtml = dom.innerHTML
-              ed.commands.setContent(updatedHtml, { emitUpdate: false })
-              onChangeRef.current(updatedHtml)
-            }
-          }, 0)
+        onReadOnlyChecked: (_node, checked) => {
+          const ed = editorRef.current
+          if (!ed) return false
+
+          const checkboxes = Array.from(ed.view.dom.querySelectorAll<HTMLInputElement>('li[data-type="taskItem"] input[type="checkbox"]'))
+          const clickedIndex = checkboxes.findIndex((checkbox) => checkbox.checked !== (checkbox.closest('li')?.dataset.checked === 'true'))
+          let taskIndex = 0
+          let position: number | null = null
+
+          ed.state.doc.descendants((node, pos) => {
+            if (position !== null || node.type.name !== 'taskItem') return position === null
+            if (taskIndex++ === clickedIndex) position = pos
+            return position === null
+          })
+
+          if (position === null) return false
+          const task = ed.state.doc.nodeAt(position)
+          if (!task) return false
+          ed.view.dispatch(ed.state.tr.setNodeMarkup(position, undefined, { ...task.attrs, checked }))
           return true
         }
       }),
