@@ -57,7 +57,7 @@ export default function CalendarEditor({ content, onChange, readOnly = false }: 
           const ed = editorRef.current
           if (!ed) return false
 
-          const checkboxes = Array.from(ed.view.dom.querySelectorAll<HTMLInputElement>('li[data-type="taskItem"] input[type="checkbox"]'))
+          const checkboxes = Array.from(ed.view.dom.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
           const clickedIndex = checkboxes.findIndex((checkbox) => checkbox.checked !== (checkbox.closest('li')?.dataset.checked === 'true'))
           let taskIndex = 0
           let position: number | null = null
