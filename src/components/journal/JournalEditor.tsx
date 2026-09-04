@@ -8,7 +8,7 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, List, ListOrdered, Save, Quote, Undo, Redo, RotateCcw, CheckSquare } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface JournalEditorProps {
   initialContent: string
@@ -77,6 +77,9 @@ const MenuBar = ({ editor, template }: { editor: Editor | null, template: string
 
 export default function JournalEditor({ initialContent, template, onSave, isSaving = false, readOnly = false }: JournalEditorProps) {
   const [content, setContent] = useState(initialContent)
+  const editorRef = useRef<Editor | null>(null)
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
 
   const editor = useEditor({
     extensions: [
@@ -84,7 +87,30 @@ export default function JournalEditor({ initialContent, template, onSave, isSavi
       Underline,
       Highlight.configure({ multicolor: true }),
       TaskList,
-      TaskItem.configure({ nested: true }),
+      TaskItem.configure({
+        nested: true,
+        onReadOnlyChecked: (_node, checked) => {
+          const ed = editorRef.current
+          if (!ed) return false
+
+          const checkboxes = Array.from(ed.view.dom.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
+          const clickedIndex = checkboxes.findIndex((checkbox) => checkbox.checked !== (checkbox.closest('li')?.dataset.checked === 'true'))
+          let taskIndex = 0
+          let position: number | null = null
+
+          ed.state.doc.descendants((node, pos) => {
+            if (position !== null || node.type.name !== 'taskItem') return position === null
+            if (taskIndex++ === clickedIndex) position = pos
+            return position === null
+          })
+
+          if (position === null) return false
+          const task = ed.state.doc.nodeAt(position)
+          if (!task) return false
+          ed.view.dispatch(ed.state.tr.setNodeMarkup(position, undefined, { ...task.attrs, checked }))
+          return true
+        }
+      }),
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
@@ -94,7 +120,9 @@ export default function JournalEditor({ initialContent, template, onSave, isSavi
     editable: !readOnly,
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
-      setContent(editor.getHTML())
+      const html = editor.getHTML()
+      setContent(html)
+      if (!editor.isEditable) onSaveRef.current?.(html)
     },
     editorProps: {
       attributes: {
@@ -104,6 +132,7 @@ export default function JournalEditor({ initialContent, template, onSave, isSavi
   })
 
   useEffect(() => {
+    editorRef.current = editor
     if (editor && initialContent !== editor.getHTML()) {
       editor.commands.setContent(initialContent)
       setContent(initialContent)

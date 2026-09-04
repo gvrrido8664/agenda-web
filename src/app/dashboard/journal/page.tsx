@@ -176,7 +176,12 @@ export default function JournalPage() {
                 Editar Bitácora
               </button>
             </div>
-            <JournalEditor initialContent={contentToRender} template={template} readOnly />
+            <JournalEditor
+              initialContent={contentToRender}
+              template={template}
+              onSave={(content) => mutation.mutate(content)}
+              readOnly
+            />
           </div>
         ) : null}
       </div>
