@@ -63,7 +63,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Redirigir si está autenticado e intenta ir a login/root
-  if ((request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/login') && user) {
+  const isPasswordReset = request.nextUrl.pathname === '/login' && request.nextUrl.searchParams.get('reset') === 'true'
+  if ((request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/login') && user && !isPasswordReset) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

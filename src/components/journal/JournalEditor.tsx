@@ -13,8 +13,9 @@ import { useEffect, useRef, useState } from 'react'
 interface JournalEditorProps {
   initialContent: string
   template: string
-  onSave?: (content: string) => void
+  onSave?: (content: string, finish?: boolean) => void
   isSaving?: boolean
+  saveStatus?: string
   readOnly?: boolean
 }
 
@@ -71,27 +72,29 @@ const MenuBar = ({ editor, template }: { editor: Editor | null, template: string
 
       <div className="flex-1" />
 
-      <button 
+      <button
         type="button"
         onClick={() => {
           if (confirm('¿Estás seguro de que quieres restaurar la plantilla? Se borrarán tus notas actuales en esta semana.')) {
             editor.commands.setContent(template)
           }
         }}
-        className="flex items-center space-x-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors border border-red-200"
+        className={btnClass(false)}
         title="Restaurar formato original"
+        aria-label="Restaurar plantilla"
       >
         <RotateCcw className="w-4 h-4" />
-        <span>Restaurar Plantilla</span>
       </button>
     </div>
   )
 }
 
-export default function JournalEditor({ initialContent, template, onSave, isSaving = false, readOnly = false }: JournalEditorProps) {
+export default function JournalEditor({ initialContent, template, onSave, isSaving = false, saveStatus, readOnly = false }: JournalEditorProps) {
   const [content, setContent] = useState(initialContent)
   const editorRef = useRef<Editor | null>(null)
   const onSaveRef = useRef(onSave)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingContentRef = useRef<string | null>(null)
   onSaveRef.current = onSave
 
   const editor = useEditor({
@@ -135,7 +138,16 @@ export default function JournalEditor({ initialContent, template, onSave, isSavi
     onUpdate: ({ editor }) => {
       const html = editor.getHTML()
       setContent(html)
-      if (!editor.isEditable) onSaveRef.current?.(html)
+      if (!editor.isEditable) {
+        onSaveRef.current?.(html)
+        return
+      }
+      pendingContentRef.current = html
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(() => {
+        if (pendingContentRef.current) onSaveRef.current?.(pendingContentRef.current)
+        pendingContentRef.current = null
+      }, 1000)
     },
     editorProps: {
       attributes: {
@@ -155,6 +167,11 @@ export default function JournalEditor({ initialContent, template, onSave, isSavi
   useEffect(() => {
     editor?.setEditable(!readOnly)
   }, [editor, readOnly])
+
+  useEffect(() => () => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    if (pendingContentRef.current) onSaveRef.current?.(pendingContentRef.current)
+  }, [])
 
   return (
     <>
@@ -180,17 +197,22 @@ export default function JournalEditor({ initialContent, template, onSave, isSavi
           flex: 1;
         }
       `}</style>
-      <div className={readOnly ? '' : 'relative flex flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-xl shadow-slate-200/40 backdrop-blur-md transition-shadow focus-within:shadow-2xl'}>
+      <div className={readOnly ? '' : 'relative flex flex-col rounded-2xl border border-white/70 bg-white/80 shadow-xl shadow-slate-200/40 transition-shadow focus-within:shadow-2xl sm:backdrop-blur-md'}>
         {!readOnly && <MenuBar editor={editor} template={template} />}
         
-        <div className="flex-1 overflow-y-auto bg-transparent">
+        <div className="flex-1 overflow-y-auto bg-transparent pb-24 sm:pb-0">
           <EditorContent editor={editor} />
         </div>
 
-        {!readOnly && <div className="flex items-center justify-end border-t border-slate-200/70 bg-slate-50/70 px-6 py-4">
+        {!readOnly && <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-xl backdrop-blur-md sm:sticky sm:inset-x-auto sm:bottom-0 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-slate-50/95 sm:px-6 sm:py-4 sm:shadow-none">
+          <p role="status" className="text-xs font-medium text-slate-500">{saveStatus}</p>
           <button
             type="button"
-            onClick={() => onSave?.(content)}
+            onClick={() => {
+              if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+              pendingContentRef.current = null
+              onSave?.(content, true)
+            }}
             disabled={isSaving}
             className="flex items-center rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-70"
           >

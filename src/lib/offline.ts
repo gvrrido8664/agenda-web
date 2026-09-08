@@ -40,7 +40,7 @@ export async function queueOffline(operation: OfflineOperation) {
 }
 
 export async function flushOfflineQueue() {
-  if (!navigator.onLine) return
+  if (!navigator.onLine) return false
 
   const key = await scopedKey('queue')
   const queue = readQueue(key)
@@ -57,6 +57,8 @@ export async function flushOfflineQueue() {
       break
     }
   }
+
+  return queue.length === 0
 }
 
 function readQueue(key: string): OfflineOperation[] {

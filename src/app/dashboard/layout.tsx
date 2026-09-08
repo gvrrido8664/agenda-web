@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, BookOpen, CalendarDays, Download, LogOut, Palette, UserCircle, WifiOff } from 'lucide-react'
+import { Calendar, BookOpen, CalendarDays, Download, LogOut, Palette, Share2, UserCircle, WifiOff, X } from 'lucide-react'
 import { ThemeProvider, useTheme } from '@/components/providers/ThemeProvider'
 import { useState, useEffect } from 'react'
 import { getUserProfile, updateUserName } from '@/lib/actions/user'
@@ -26,6 +26,8 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   const [isSavingName, setIsSavingName] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [isIos, setIsIos] = useState(false)
+  const [showInstallHelp, setShowInstallHelp] = useState(false)
 
   useEffect(() => {
     getUserProfile()
@@ -49,6 +51,9 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
     }
 
     updateConnection()
+    const iosNavigator = navigator as Navigator & { standalone?: boolean }
+    const appleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    setIsIos(appleMobile && !iosNavigator.standalone)
     window.addEventListener('online', updateConnection)
     window.addEventListener('offline', updateConnection)
     window.addEventListener('beforeinstallprompt', captureInstall)
@@ -89,11 +94,17 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   }
 
   const handleInstall = async () => {
+    if (isIos) {
+      setShowInstallHelp(true)
+      return
+    }
     if (!installPrompt) return
     await installPrompt.prompt()
     await installPrompt.userChoice
     setInstallPrompt(null)
   }
+
+  const canInstall = Boolean(installPrompt || isIos)
 
   const colorOptions = [
     { name: 'Gris', class: 'bg-gray-50', hex: 'bg-gray-200' },
@@ -116,6 +127,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             <input
               id="profile-name"
               type="text"
+              autoFocus
               className="mb-4 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-center text-lg font-medium text-slate-900 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
               placeholder="Tu nombre..."
               value={tempName}
@@ -134,6 +146,24 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
+      {showInstallHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onKeyDown={(event) => event.key === 'Escape' && setShowInstallHelp(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="install-title" className="relative w-full max-w-sm rounded-2xl bg-white p-7 shadow-2xl">
+            <button autoFocus onClick={() => setShowInstallHelp(false)} className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full text-slate-500 hover:bg-slate-100" aria-label="Cerrar instrucciones">
+              <X className="h-5 w-5" />
+            </button>
+            <Download className="mb-4 h-10 w-10 text-blue-600" />
+            <h2 id="install-title" className="text-xl font-semibold text-slate-900">Instalar en iPhone</h2>
+            <ol className="mt-5 space-y-4 text-sm text-slate-600">
+              <li className="flex gap-3"><span className="font-bold text-blue-600">1.</span><span>Abre esta página en <strong>Safari</strong>.</span></li>
+              <li className="flex gap-3"><span className="font-bold text-blue-600">2.</span><span>Pulsa <Share2 className="mx-1 inline h-4 w-4" aria-hidden="true" /> <strong>Compartir</strong>.</span></li>
+              <li className="flex gap-3"><span className="font-bold text-blue-600">3.</span><span>Elige <strong>Agregar a pantalla de inicio</strong>.</span></li>
+            </ol>
+            <button onClick={() => setShowInstallHelp(false)} className="mt-6 w-full rounded-xl bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700">Entendido</button>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className="z-20 flex w-full shrink-0 flex-col border-b border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-xl lg:w-72 lg:border-b-0 lg:border-r">
         <div className="flex h-16 items-center gap-3 border-b border-slate-100 px-5 lg:h-20 lg:px-7">
@@ -145,7 +175,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             <p className="text-xs text-slate-500">Organización personal</p>
           </div>
           {!isOnline && <WifiOff className="ml-auto h-5 w-5 text-amber-600 lg:hidden" aria-label="Sin conexión" />}
-          {installPrompt && (
+          {canInstall && (
             <button
               onClick={handleInstall}
               className={`${isOnline ? 'ml-auto' : ''} rounded-lg p-2 text-blue-600 transition hover:bg-blue-50 lg:hidden`}
@@ -187,7 +217,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
           </Link>
         </nav>
 
-        <div className="flex items-center gap-2 border-t border-slate-100 px-5 py-2.5 lg:hidden">
+        <div className="flex items-center gap-1 border-t border-slate-100 px-4 py-2 lg:hidden">
           <Palette className="mr-1 h-4 w-4 text-slate-400" aria-hidden="true" />
           <span className="mr-auto text-xs font-semibold uppercase tracking-wider text-slate-400">Fondo</span>
           {colorOptions.map((color) => (
@@ -197,8 +227,10 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
               title={color.name}
               aria-label={`Fondo ${color.name}`}
               aria-pressed={theme === color.class}
-              className={`h-5 w-5 rounded-full border-2 ${color.hex} ${theme === color.class ? 'scale-110 border-slate-500' : 'border-transparent'}`}
-            />
+              className="grid h-9 w-8 place-items-center rounded-full"
+            >
+              <span className={`h-5 w-5 rounded-full border-2 ${color.hex} ${theme === color.class ? 'scale-110 border-slate-500' : 'border-transparent'}`} />
+            </button>
           ))}
         </div>
 
@@ -229,7 +261,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
               Trabajando sin conexión
             </div>
           )}
-          {installPrompt && (
+          {canInstall && (
             <button
               onClick={handleInstall}
               className="mb-3 flex w-full items-center rounded-lg px-2 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"

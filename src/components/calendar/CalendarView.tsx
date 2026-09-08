@@ -40,7 +40,10 @@ export default function CalendarView() {
   const [eventId, setEventId] = useState<string | null>(null)
   const [eventTitle, setEventTitle] = useState('')
   const [eventContent, setEventContent] = useState('')
+  const [originalEventContent, setOriginalEventContent] = useState('')
   const [mutationError, setMutationError] = useState<string | null>(null)
+  const [saveStatus, setSaveStatus] = useState('')
+  const [showPastEvents, setShowPastEvents] = useState(false)
   
   const queryClient = useQueryClient()
   const { theme } = useTheme()
@@ -67,7 +70,10 @@ export default function CalendarView() {
 
   const saveMutation = useMutation({
     mutationFn: async (data: { id: string | null, date: string, title: string, content: string }) => {
-      if (navigator.onLine) return saveEvent(data.id, data.date, data.title, data.content)
+      if (navigator.onLine) {
+        await saveEvent(data.id, data.date, data.title, data.content)
+        return { offline: false }
+      }
 
       const localId = data.id ?? `offline-${crypto.randomUUID()}`
       const cached = await readOffline<DailyNote[]>(cacheKey) ?? []
@@ -78,13 +84,18 @@ export default function CalendarView() {
         localId,
         payload: [data.id?.startsWith('offline-') ? null : data.id, data.date, data.title, data.content],
       })
-      return [note]
+      return { offline: true }
     },
-    onSuccess: () => {
+    onMutate: () => setSaveStatus('Guardando…'),
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['notes'] })
       setMutationError(null)
+      setSaveStatus(result.offline ? 'Guardado localmente' : 'Guardado')
     },
-    onError: () => setMutationError('No pudimos guardar el evento. Inténtalo nuevamente.')
+    onError: () => {
+      setMutationError('No pudimos guardar el evento. Inténtalo nuevamente.')
+      setSaveStatus('No se pudo guardar')
+    }
   })
 
   const deleteMutation = useMutation({
@@ -104,10 +115,14 @@ export default function CalendarView() {
   })
 
   useEffect(() => {
-    const sync = () => flushOfflineQueue().then(() => queryClient.invalidateQueries({ queryKey: ['notes'] }))
-    window.addEventListener('online', sync)
+    const sync = (showStatus = false) => flushOfflineQueue().then((synced) => {
+      queryClient.invalidateQueries({ queryKey: ['notes'] })
+      if (showStatus) setSaveStatus(synced ? 'Sincronizado' : 'Pendiente de sincronización')
+    })
+    const handleOnline = () => void sync(true)
+    window.addEventListener('online', handleOnline)
     void sync()
-    return () => window.removeEventListener('online', sync)
+    return () => window.removeEventListener('online', handleOnline)
   }, [queryClient])
 
   const events: CalendarEvent[] = notes?.map((note: DailyNote) => {
@@ -123,6 +138,21 @@ export default function CalendarView() {
       resource: note
     }
   }) || []
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const isCurrentMonth = currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear()
+  const sortedMobileEvents = [...events].sort((a, b) => a.start.getTime() - b.start.getTime())
+  const pastEventCount = isCurrentMonth ? sortedMobileEvents.filter((event) => event.start < today).length : 0
+  const visibleMobileEvents = showPastEvents ? sortedMobileEvents : sortedMobileEvents.filter((event) => !isCurrentMonth || event.start >= today)
+  const mobileEventGroups = visibleMobileEvents.reduce<Array<{ date: Date, events: CalendarEvent[] }>>((groups, event) => {
+    const last = groups[groups.length - 1]
+    if (last && last.date.toDateString() === event.start.toDateString()) last.events.push(event)
+    else groups.push({ date: event.start, events: [event] })
+    return groups
+  }, [])
+
+  useEffect(() => setShowPastEvents(false), [start])
 
   // Extraer el color principal del tema actual de forma tosca pero efectiva
   const themeColors: Record<string, string> = {
@@ -153,6 +183,7 @@ export default function CalendarView() {
     setEventId(null)
     setEventTitle('')
     setEventContent('')
+    setOriginalEventContent('')
     setMutationError(null)
     setIsViewing(false)
     setModalOpen(true)
@@ -163,6 +194,7 @@ export default function CalendarView() {
     setEventId(event.id)
     setEventTitle(event.resource.title || '')
     setEventContent(event.resource.content || '')
+    setOriginalEventContent(event.resource.content || '')
     setMutationError(null)
     setIsViewing(true)
     setModalOpen(true)
@@ -182,6 +214,7 @@ export default function CalendarView() {
         }}
         className="z-20 hidden rounded-full p-1 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-500 sm:inline-flex"
         title="Nuevo evento"
+        aria-label={`Nuevo evento el ${label}`}
       >
         <Plus className="w-4 h-4" />
       </button>
@@ -197,13 +230,16 @@ export default function CalendarView() {
         title: eventTitle,
         content: eventContent,
       }, {
-        onSuccess: () => setModalOpen(false)
+        onSuccess: () => {
+          setOriginalEventContent(eventContent)
+          setModalOpen(false)
+        }
       })
     }
   }
 
   const handleClose = () => {
-    if (isViewing && eventId && selectedDate) {
+    if (isViewing && eventId && selectedDate && eventContent !== originalEventContent) {
       if (saveMutation.isPending) return
       saveMutation.mutate({
         id: eventId,
@@ -211,7 +247,10 @@ export default function CalendarView() {
         title: eventTitle,
         content: eventContent,
       }, {
-        onSuccess: () => setModalOpen(false)
+        onSuccess: () => {
+          setOriginalEventContent(eventContent)
+          setModalOpen(false)
+        }
       })
       return
     }
@@ -265,6 +304,7 @@ export default function CalendarView() {
           No pudimos cargar tus eventos. Revisa tu conexión e inténtalo nuevamente.
         </div>
       )}
+      {saveStatus && <p role="status" className="mb-2 text-right text-xs font-medium text-slate-500">{saveStatus}</p>}
       
       <div className="flex-1 rounded-xl border border-white/70 bg-white/80 p-1.5 shadow-xl shadow-slate-200/40 backdrop-blur-md sm:rounded-2xl sm:p-6">
         <Calendar<CalendarEvent>
@@ -301,36 +341,48 @@ export default function CalendarView() {
       {!isLoading && (
         <section className="mt-3 rounded-xl border border-white/70 bg-white/80 p-4 shadow-lg shadow-slate-200/30 sm:hidden" aria-labelledby="mobile-events-title">
           <h3 id="mobile-events-title" className="mb-3 text-sm font-semibold text-slate-800">Eventos de este mes</h3>
-          {events.length ? (
-            <div className="space-y-2">
-              {[...events].sort((a, b) => a.start.getTime() - b.start.getTime()).map((event) => (
-                <button
-                  key={event.id}
-                  type="button"
-                  onClick={() => handleSelectEvent(event)}
-                  className="flex w-full items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50"
-                >
-                  <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: eventColor }} />
-                  <span className="min-w-0 flex-1 text-sm font-medium text-slate-800">{String(event.title)}</span>
-                  <span className="shrink-0 text-xs font-semibold uppercase text-slate-500">{format(event.start, 'd MMM', { locale: es })}</span>
-                </button>
+          {mobileEventGroups.length ? (
+            <div className="space-y-4">
+              {mobileEventGroups.map((group) => (
+                <div key={group.date.toISOString()}>
+                  <p className="mb-2 text-xs font-semibold capitalize text-slate-500">{format(group.date, "EEEE d 'de' MMMM", { locale: es })}</p>
+                  <div className="space-y-2">
+                    {group.events.map((event) => (
+                      <button
+                        key={event.id}
+                        type="button"
+                        onClick={() => handleSelectEvent(event)}
+                        className="flex w-full items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50"
+                      >
+                        <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: eventColor }} />
+                        <span className="min-w-0 flex-1 text-sm font-medium text-slate-800">{String(event.title)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Aún no hay eventos este mes.</p>
+            <p className="text-sm text-slate-500">{events.length ? 'No hay próximos eventos este mes.' : 'Aún no hay eventos este mes.'}</p>
+          )}
+          {pastEventCount > 0 && (
+            <button type="button" onClick={() => setShowPastEvents((show) => !show)} className="mt-4 text-sm font-semibold text-blue-600 hover:text-blue-700">
+              {showPastEvents ? 'Ocultar eventos pasados' : `Mostrar eventos pasados (${pastEventCount})`}
+            </button>
           )}
         </section>
       )}
 
       {modalOpen && selectedDate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onKeyDown={(event) => event.key === 'Escape' && handleClose()}>
-          <div role="dialog" aria-modal="true" aria-labelledby="event-dialog-title" className="flex w-full max-w-lg flex-col rounded-2xl border border-white/40 bg-white p-6 shadow-2xl sm:p-7">
+          <div role="dialog" aria-modal="true" aria-labelledby="event-dialog-title" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-white/40 bg-white p-6 shadow-2xl sm:p-7">
             <div className="flex justify-between items-start mb-5">
               <h3 id="event-dialog-title" className="text-xl font-semibold capitalize text-slate-900">
                 {eventId ? (isViewing ? 'Ver evento' : 'Editar evento') : 'Nuevo evento'} · {format(selectedDate, "d 'de' MMMM", { locale: es })}
               </h3>
               {isViewing && (
                 <button
+                  autoFocus
                   onClick={() => setIsViewing(false)}
                   className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-100 transition-colors ml-4"
                 >
@@ -370,7 +422,7 @@ export default function CalendarView() {
             )}
             {mutationError && <p role="alert" className="mt-3 text-sm text-red-600">{mutationError}</p>}
             
-            <div className="mt-6 flex justify-between items-center">
+            <div className="sticky -bottom-6 -mx-6 -mb-6 mt-6 flex items-center justify-between border-t border-slate-100 bg-white px-6 py-4 sm:-bottom-7 sm:-mx-7 sm:-mb-7 sm:px-7">
               {eventId ? (
                 <button
                   className="flex items-center rounded-xl px-4 py-2 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
