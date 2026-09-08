@@ -126,8 +126,6 @@ export default function JournalPage() {
             <hr />
             <p><strong>Fin de Semana</strong></p>
             <p>Importantes:</p><ul><li><p></p></li></ul>
-            <p>Auto estudio:</p><ul><li><p></p></li></ul>
-            <p>Clases:</p><ul><li><p></p></li></ul>
           </td>
         </tr>
       </tbody>
