@@ -7,7 +7,7 @@ import Highlight from '@tiptap/extension-highlight'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
-import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, List, ListOrdered, Save, Quote, Undo, Redo, RotateCcw, CheckSquare } from 'lucide-react'
+import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, List, ListOrdered, Save, Quote, Undo, Redo, RotateCcw, CheckSquare, Eraser } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 interface JournalEditorProps {
@@ -20,6 +20,7 @@ interface JournalEditorProps {
 
 const MenuBar = ({ editor, template }: { editor: Editor | null, template: string }) => {
   const [, forceUpdate] = useState(0)
+  const [highlightColor, setHighlightColor] = useState('#fde047')
 
   useEffect(() => {
     if (!editor) return
@@ -48,6 +49,18 @@ const MenuBar = ({ editor, template }: { editor: Editor | null, template: string
       <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(editor.isActive('italic'))} title="Cursiva" aria-label="Cursiva"><Italic className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={btnClass(editor.isActive('underline'))} title="Subrayado" aria-label="Subrayado"><UnderlineIcon className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={btnClass(editor.isActive('strike'))} title="Tachado" aria-label="Tachado"><Strikethrough className="w-4 h-4" /></button>
+      <input
+        type="color"
+        value={highlightColor}
+        onChange={(event) => {
+          setHighlightColor(event.target.value)
+          editor.chain().focus().setHighlight({ color: event.target.value }).run()
+        }}
+        className="h-8 w-9 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+        title="Color del destacador"
+        aria-label="Color del destacador"
+      />
+      <button type="button" onClick={() => editor.chain().focus().unsetHighlight().run()} className={btnClass(false)} title="Quitar destacador" aria-label="Quitar destacador"><Eraser className="w-4 h-4" /></button>
       
       <div className="w-px h-5 bg-gray-300 mx-1" />
 

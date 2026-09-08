@@ -64,6 +64,10 @@ textarea:focus-visible {
   color: #273249;
 }
 
+.rbc-calendar.agenda-calendar {
+  height: calc(100vh - 14rem);
+}
+
 .rbc-month-view {
   overflow: hidden;
   border: 1px solid var(--border);
@@ -124,14 +128,35 @@ textarea:focus-visible {
 }
 
 @media (max-width: 640px) {
+  .rbc-calendar.agenda-calendar {
+    height: max(30rem, calc(100dvh - 15.5rem));
+  }
+
   .rbc-header {
-    padding-inline: 0.15rem;
+    padding: 0.55rem 0.1rem;
     font-size: 0.65rem;
     letter-spacing: 0;
   }
 
   .rbc-date-cell {
-    padding: 0.35rem 0.4rem 0;
+    padding: 0.3rem 0.3rem 0;
+  }
+
+  .rbc-row-segment {
+    padding: 0 1px 1px;
+  }
+
+  .rbc-event {
+    min-height: 1.15rem;
+    border-radius: 0.25rem !important;
+    padding: 0.12rem 0.25rem;
+    font-size: 0.68rem;
+    line-height: 1.15;
+  }
+
+  .rbc-event-content {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tiptap-table-split table,

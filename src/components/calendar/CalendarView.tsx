@@ -173,19 +173,19 @@ export default function CalendarView() {
   }), [handleSelectSlot])
 
   const CustomDateHeader = useCallback(({ label, date }: { label: string, date: Date }) => (
-    <div className="flex justify-end items-center gap-1 pr-1">
+    <div className="flex items-center justify-end gap-1 pr-1">
       <button
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
           handleSelectSlot({ start: date })
         }}
-        className="p-1 text-slate-400 hover:text-blue-500 rounded-full hover:bg-blue-50 transition-colors z-20"
+        className="z-20 hidden rounded-full p-1 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-500 sm:inline-flex"
         title="Nuevo evento"
       >
         <Plus className="w-4 h-4" />
       </button>
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-xs font-medium sm:text-sm">{label}</span>
     </div>
   ), [handleSelectSlot])
 
@@ -230,20 +230,21 @@ export default function CalendarView() {
     }
 
     return (
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
-        <div className="flex items-center space-x-2 bg-white/80 p-1 border border-white/50 rounded-lg shadow-sm">
+      <div className="mb-3 grid grid-cols-[auto_1fr] items-center gap-2 sm:mb-6 sm:grid-cols-[1fr_auto_1fr]">
+        <div className="flex w-fit items-center space-x-1 rounded-lg border border-white/50 bg-white/80 p-1 shadow-sm sm:space-x-2">
           <button onClick={goToBack} className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-white" title="Anterior" aria-label="Mes anterior">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <button onClick={goToCurrent} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-white sm:px-4">
-            Mes Actual
+          <button onClick={goToCurrent} className="rounded-lg px-2 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-white sm:px-4">
+            <span className="sm:hidden">Hoy</span>
+            <span className="hidden sm:inline">Mes Actual</span>
           </button>
           <button onClick={goToNext} className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-white" title="Siguiente" aria-label="Mes siguiente">
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
 
-        <h2 className="text-xl font-semibold capitalize tracking-tight text-slate-900 sm:text-2xl">
+        <h2 className="truncate text-right text-lg font-semibold capitalize tracking-tight text-slate-900 sm:text-center sm:text-2xl">
           {label()}
         </h2>
 
@@ -265,13 +266,13 @@ export default function CalendarView() {
         </div>
       )}
       
-      <div className="flex-1 rounded-2xl border border-white/70 bg-white/80 p-3 shadow-xl shadow-slate-200/40 backdrop-blur-md sm:p-6">
+      <div className="flex-1 rounded-xl border border-white/70 bg-white/80 p-1.5 shadow-xl shadow-slate-200/40 backdrop-blur-md sm:rounded-2xl sm:p-6">
         <Calendar<CalendarEvent>
           localizer={localizer}
           events={events}
           startAccessor="start"
           endAccessor="end"
-          style={{ height: 'calc(100vh - 14rem)' }}
+          className="agenda-calendar"
           views={['month']}
           defaultView={'month'}
           date={currentDate}
@@ -296,6 +297,30 @@ export default function CalendarView() {
           }}
         />
       </div>
+
+      {!isLoading && (
+        <section className="mt-3 rounded-xl border border-white/70 bg-white/80 p-4 shadow-lg shadow-slate-200/30 sm:hidden" aria-labelledby="mobile-events-title">
+          <h3 id="mobile-events-title" className="mb-3 text-sm font-semibold text-slate-800">Eventos de este mes</h3>
+          {events.length ? (
+            <div className="space-y-2">
+              {[...events].sort((a, b) => a.start.getTime() - b.start.getTime()).map((event) => (
+                <button
+                  key={event.id}
+                  type="button"
+                  onClick={() => handleSelectEvent(event)}
+                  className="flex w-full items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50"
+                >
+                  <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: eventColor }} />
+                  <span className="min-w-0 flex-1 text-sm font-medium text-slate-800">{String(event.title)}</span>
+                  <span className="shrink-0 text-xs font-semibold uppercase text-slate-500">{format(event.start, 'd MMM', { locale: es })}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">Aún no hay eventos este mes.</p>
+          )}
+        </section>
+      )}
 
       {modalOpen && selectedDate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onKeyDown={(event) => event.key === 'Escape' && handleClose()}>
