@@ -64,3 +64,7 @@ En el Supabase configurado se comprobó una sesión autenticada en navegador: cr
 ![Calendario con eventos ficticios](docs/calendario-prueba.jpg)
 
 ![Bitácora ficticia recuperada tras recargar](docs/bitacora-prueba.jpg)
+
+## Robustez de la sincronización
+
+Se reprodujo y corrigió la pérdida de ediciones nuevas durante una sincronización en curso. La cola ahora conserva los cambios recibidos mientras espera al servidor, comparte la sincronización entre llamadas de la misma cuenta/pestaña y reutiliza el ID recién creado para una edición pendiente. La prueba automatizada cubre estos casos con acciones simuladas; no prueba desconexión real del navegador, respuesta perdida después de una escritura ni coordinación entre pestañas.

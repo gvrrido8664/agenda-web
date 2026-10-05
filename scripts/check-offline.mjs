@@ -4,9 +4,9 @@ import vm from 'node:vm'
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const ts = require('typescript')
-let user = 'A', fail = false
+let user = 'A', fail = false, pause = async () => {}
 const calls = [], storage = new Map()
-const action = async (...args) => { if (fail) throw Error('Disconnected'); calls.push([user,...args]) }
+const action = async (...args) => { if (fail) throw Error('Disconnected'); calls.push([user,...args]); await pause(); return [{id: args[0] ?? 'saved-id'}] }
 const context = vm.createContext({
   exports: {}, navigator: { onLine: true },
   localStorage: { getItem:k=>storage.get(k)??null, setItem:(k,v)=>storage.set(k,v) },
@@ -32,4 +32,28 @@ user='A';assert.equal(await api.flushOfflineQueue(),true);assert.equal(calls.len
 await api.queueOffline(op)
 await api.queueOffline({kind:'delete-event',localId:'offline-A',payload:['offline-A']})
 assert.equal(JSON.parse(storage.get('agenda-offline:A:queue')).length,0)
-console.log('PASS: per-user cache/queue, deduplication, offline retention, retry and local deletion. Server actions mocked; not an end-to-end Supabase test.')
+let release, started
+const entered = new Promise(resolve => { started = resolve })
+pause = () => new Promise(resolve => { release = resolve; started() })
+await api.queueOffline({kind:'save-event',localId:'existing',payload:['existing','2026-10-05','First','']})
+const syncing = api.flushOfflineQueue()
+await entered
+await api.queueOffline({kind:'save-event',localId:'existing',payload:['existing','2026-10-05','Latest','']})
+await api.queueOffline({kind:'save-log',localId:'week-42',payload:[42,2026,'New journal']})
+const simultaneous = api.flushOfflineQueue()
+pause = async () => {}; release()
+await Promise.all([syncing,simultaneous])
+assert.equal(calls.filter(call=>call[3]==='Latest').length,1,'An edit made during synchronization must survive')
+assert.equal(calls.filter(call=>call[3]==='First').length,1,'Concurrent flushes must not duplicate an operation')
+assert.equal(calls.filter(call=>call[3]==='New journal').length,1,'A queued journal must not disappear')
+let nextStarted
+const nextEntered = new Promise(resolve => { nextStarted = resolve })
+pause = () => new Promise(resolve => { release = resolve; nextStarted() })
+await api.queueOffline({...op,payload:[null,'2026-10-05','New event','']})
+const creating = api.flushOfflineQueue()
+await nextEntered
+await api.queueOffline({...op,payload:[null,'2026-10-05','Edited during creation','']})
+pause = async () => {}; release(); await creating
+assert.equal(calls.find(call=>call[3]==='Edited during creation')[1],'saved-id','An edit must reuse the inserted event ID')
+assert.equal(JSON.parse(storage.get('agenda-offline:A:queue')).length,0)
+console.log('PASS: per-user cache/queue, deduplication, offline retention, retry, local deletion, concurrent flushes and edits during synchronization. Server actions mocked; not an end-to-end Supabase test.')
