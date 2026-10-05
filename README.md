@@ -59,4 +59,8 @@ Proyecto personal de **Ignacio Garrido**, Ingeniero en Informática titulado. De
 
 Comprobados typecheck, lint y build con las rutas `/dashboard` y `/dashboard/journal` incluidas. La cola offline se comprobó con acciones de servidor simuladas: separación por usuario, reemplazo de cambios pendientes, conservación ante fallo, reintento y eliminación local. `supabase/check_rls.sql` aprobó en PostgreSQL local aislado la separación de perfiles/notas/bitácoras, rechazo de cambios ajenos, protección del correo y múltiples eventos por día; el bootstrap local simula auth.uid, no valida tokens de Supabase.
 
-El proyecto Supabase configurado respondió HTTP 200 en Auth/PostgREST y no devolvió filas de usuarios/notas/bitácoras al cliente anónimo. La sesión autenticada y la sincronización completa en navegador siguen pendientes de iniciar sesión con una cuenta confirmada. Ninguna de las comprobaciones de lectura modificó datos alojados.
+En el Supabase configurado se comprobó una sesión autenticada en navegador: creación y edición de eventos, dos eventos el mismo día, persistencia del calendario al recargar y guardado/recuperación de una bitácora semanal. Se usaron exclusivamente registros ficticios de prueba. Auth/PostgREST respondió HTTP 200 y el cliente anónimo no devolvió filas de usuarios/notas/bitácoras. Quedan pendientes la desconexión/reconexión real del navegador y el aislamiento entre dos cuentas contra Supabase; las pruebas locales anteriores no sustituyen esas comprobaciones.
+
+![Calendario con eventos ficticios](docs/calendario-prueba.jpg)
+
+![Bitácora ficticia recuperada tras recargar](docs/bitacora-prueba.jpg)
