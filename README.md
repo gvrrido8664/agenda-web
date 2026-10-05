@@ -50,3 +50,10 @@ npm run build
 ```
 
 Las rutas bajo `/dashboard` requieren una sesión válida de Supabase. Row Level Security limita cada perfil, evento y bitácora a su propietario.
+
+## Portafolio personal
+Proyecto personal de **Ignacio Garrido**, Ingeniero en Informática titulado. Desarrollo propio de la aplicación; librerías, plantillas, datos e imágenes de terceros conservan su autoría.
+
+![Acceso local](docs/login.jpg)
+
+Comprobados typecheck, lint, build y página de acceso. El calendario autenticado, RLS y sincronización no se ejercitaron con una cuenta Supabase en esta revisión; se necesita un proyecto propio siguiendo schema.sql.
