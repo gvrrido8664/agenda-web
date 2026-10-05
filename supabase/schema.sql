@@ -8,7 +8,7 @@ CREATE TABLE public.users (
 
 -- Notas Diarias (Eventos y Estado del día)
 CREATE TABLE public.daily_notes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     title VARCHAR(120) NOT NULL DEFAULT 'Sin título',
@@ -16,13 +16,14 @@ CREATE TABLE public.daily_notes (
     tags TEXT[],
     day_state VARCHAR(20),
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(user_id, date) 
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX daily_notes_user_id_date_idx ON public.daily_notes (user_id, date);
 
 -- Bitácoras Semanales
 CREATE TABLE public.weekly_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     iso_week INTEGER NOT NULL,
     year INTEGER NOT NULL,

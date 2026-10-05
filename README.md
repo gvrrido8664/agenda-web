@@ -14,7 +14,7 @@ Agenda personal instalable con calendario mensual y bitácora semanal, construid
 ## Configuración local
 
 1. Copia `.env.example` como `.env.local` y completa las credenciales públicas de Supabase.
-2. Ejecuta `supabase/schema.sql` en un proyecto nuevo. Para una base existente, aplica `supabase/migrations/20260903_harden_schema.sql`.
+2. Ejecuta `supabase/schema.sql` en un proyecto nuevo. Para una base existente, revisa y aplica las migraciones `20260903_harden_schema.sql`, `20260903_sync_auth_users.sql` y `20260903_allow_multiple_daily_events.sql`; no vuelvas a crear tablas existentes.
 3. Instala y levanta la aplicación:
 
 ```bash
@@ -46,6 +46,7 @@ Vercel ejecutará `npm run build`. El HTTPS del despliegue permite que el navega
 ```bash
 npm run typecheck
 npm run lint
+npm run check:offline
 npm run build
 ```
 
@@ -56,4 +57,6 @@ Proyecto personal de **Ignacio Garrido**, Ingeniero en Informática titulado. De
 
 ![Acceso local](docs/login.jpg)
 
-Comprobados typecheck, lint, build y página de acceso. El calendario autenticado, RLS y sincronización no se ejercitaron con una cuenta Supabase en esta revisión; se necesita un proyecto propio siguiendo schema.sql.
+Comprobados typecheck, lint y build con las rutas `/dashboard` y `/dashboard/journal` incluidas. La cola offline se comprobó con acciones de servidor simuladas: separación por usuario, reemplazo de cambios pendientes, conservación ante fallo, reintento y eliminación local. `supabase/check_rls.sql` aprobó en PostgreSQL local aislado la separación de perfiles/notas/bitácoras, rechazo de cambios ajenos, protección del correo y múltiples eventos por día; el bootstrap local simula auth.uid, no valida tokens de Supabase.
+
+El proyecto Supabase configurado respondió HTTP 200 en Auth/PostgREST y no devolvió filas de usuarios/notas/bitácoras al cliente anónimo. La sesión autenticada y la sincronización completa en navegador siguen pendientes de iniciar sesión con una cuenta confirmada. Ninguna de las comprobaciones de lectura modificó datos alojados.
